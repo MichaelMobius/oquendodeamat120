@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Poema Neón Interactivo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: black;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 100vh;
+        font-family: 'Courier New', Courier, monospace;
+      }
+
+      .bg-left {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: auto;
+        z-index: 0;
+        opacity: 0.4;
+        pointer-events: none;
+      }
+
+      #start-btn {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: black;
+        color: #ff00ff;
+        border: 2px solid #ff00ff;
+        padding: 1em 2em;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 10;
+        box-shadow: 0 0 10px #ff00ff;
+      }
+
+      .neon {
+        color: #f0f0f0;
+        font-size: 14px;
+        white-space: pre-line;
+        text-shadow:
+          0 0 5px #fff,
+          0 0 10px #ff00ff,
+          0 0 20px #ff00ff,
+          0 0 40px #ff00ff,
+          0 0 80px #ff00ff;
+        cursor: pointer;
+        position: absolute;
+        user-select: none;
+        animation: flicker 2s infinite;
+        animation-delay: calc(var(--flicker-delay, 0s));
+      }
+
+      .neon.big {
+        font-size: 18px;
+        text-shadow:
+          0 0 5px #fff,
+          0 0 10px #00ffff,
+          0 0 20px #00ffff,
+          0 0 40px #00ffff,
+          0 0 80px #00ffff;
+      }
+
+      .neon.italic {
+        font-style: italic;
+      }
+
+      canvas {
+        display: none;
+      }
+
+      .final-margin {
+        height: 100px;
+        width: 100%;
+      }
+
+      @keyframes flicker {
+        0%, 100% { opacity: 1; }
+        45% { opacity: 0.9; }
+        48% { opacity: 0.4; }
+        50% { opacity: 1; }
+        52% { opacity: 0.5; }
+        55% { opacity: 1; }
+        57% { opacity: 0.2; }
+        60% { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <img src="A_linocut-style_illustration_depicts_a_row_of_hist.png" class="bg-left" />
+    <button id="start-btn">120 años del nacimiento de Carlos Oquendo de Amat</button>
+    <div class="final-margin"></div>
+
+    <script>
+      let textos = [
+        { txt: 'Los árboles pronto romperán sus amarras\ny son ramos de flores todos los policías', dx: -150, dy: -270 },
+        { txt: 'CONEY ISLAND\nLa lluvia es una moneda de afeitar', dx: -300, dy: -180 },
+        { txt: 'WALL STREET\nLa brisa dobla los tallos\nde las artistas de la Paramount', dx: 100, dy: -180 },
+        { txt: 'El tráfico\nescribe\nuna carta de novia', dx: -70, dy: -100, italic: true },
+        { txt: 'T\nI\nM\nE\n\nI\nS\n\nM\nO\nN\nE\nY', dx: 0, dy: -10, big: true },
+        { txt: 'Los teléfonos\nson depósitos de licor', dx: -270, dy: 100 },
+        { txt: 'Diez c o r r e d o r e s\ndesnudos en la Underwood', dx: 100, dy: 100 },
+        { txt: '28 PISO', dx: -330, dy: 180 },
+        { txt: 'CHARLESTON\nRODOLFO VALENTINO HACE CRECER EL CABELLO\nNADIE PODRÁ TENER MÁS DE 30 AÑOS', dx: -200, dy: 280, big: true },
+        { txt: '(porque habrán disminuido los hombros 25 centímetros\ny andarán oblicuos sobre una pared)', dx: -200, dy: 350 },
+        { txt: 'Mary Pickford sube por la mirada del administrador', dx: -200, dy: 420 },
+        { txt: '.', dx: 0, dy: 470 },
+      ];
+
+      let efectos = [];
+      let centroX, centroY;
+      let player, gainNode;
+      let started = false;
+
+      document.getElementById('start-btn').addEventListener('click', async () => {
+        await Tone.start();
+        gainNode = new Tone.Gain(0.5).toDestination();
+        player = new Tone.Player("neonlight_highpitch-7058.mp3").connect(gainNode);
+        player.loop = true;
+        player.autostart = true;
+        document.getElementById('start-btn').style.display = 'none';
+        started = true;
+        setupPoema();
+      });
+
+      function setupPoema() {
+        createCanvas(1, 1);
+        centroX = windowWidth / 2;
+        centroY = windowHeight / 2 + window.scrollY;
+
+        textos.forEach((t, i) => {
+          let div = createDiv(t.txt);
+          div.class('neon');
+          if (t.big) div.addClass('big');
+          if (t.italic) div.addClass('italic');
+          let x = centroX + t.dx;
+          let y = centroY + t.dy;
+          div.position(x, y);
+          div.style('--flicker-delay', `${random(0, 2)}s`);
+          div.mousePressed(() => toggleEfecto(i, div));
+          efectos[i] = {
+            activo: false,
+            baseX: x,
+            baseY: y,
+            modo: int(random(4)),
+            flickerPhase: random(TWO_PI)
+          };
+        });
+      }
+
+      function draw() {
+        if (!started) return;
+
+        let intensity = 0;
+
+        efectos.forEach((e, i) => {
+          let flicker = abs(sin(frameCount * 0.05 + e.flickerPhase));
+          intensity += flicker;
+
+          if (e.activo) {
+            let div = selectAll('.neon')[i];
+            let x = e.baseX;
+            let y = e.baseY;
+            switch (e.modo) {
+              case 0: x += sin(frameCount * 0.1 + i) * 10; break;
+              case 1: y += cos(frameCount * 0.2 + i) * 10; break;
+              case 2: let offset = sin(frameCount * 0.1) * 20; x += offset; y += offset; break;
+              case 3: let zigzag = (frameCount % 40 < 20) ? -10 : 10; x += zigzag; break;
+            }
+            div.position(x, y);
+          }
+        });
+
+        let averageIntensity = constrain(intensity / efectos.length, 0.2, 1);
+        if (gainNode) gainNode.gain.rampTo(averageIntensity * 0.5, 0.1);
+      }
+
+      function toggleEfecto(index, div) {
+        efectos[index].activo = !efectos[index].activo;
+        if (!efectos[index].activo) {
+          div.position(efectos[index].baseX, efectos[index].baseY);
+        }
+      }
+
+      function windowResized() {
+        centroX = windowWidth / 2;
+      }
+    </script>
+  </body>
+</html>
+
